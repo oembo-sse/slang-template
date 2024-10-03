@@ -67,15 +67,19 @@ impl slang_ui::Hook for App {
 fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
     match &cmd.kind {
         CmdKind::Assert { condition, .. } => Ok(IVLCmd::assert(condition, "Assert might fail!")),
-        _ => todo!("Not supported (yet)."),
+        CmdKind::VarDefinition { name, ty, expr } => Ok(IVLCmd::havoc(name, &ty.1)),
+        CmdKind::Assignment { name, expr } => Ok(IVLCmd::assign(name, expr)),
+        _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
     }
 }
 
 // Weakest precondition of (assert-only) IVL programs comprised of a single
 // assertion
-fn wp(ivl: &IVLCmd, _: &Expr) -> Result<(Expr, String)> {
+fn wp(ivl: &IVLCmd, postCondition: &Expr) -> Result<(Expr, String)> {
     match &ivl.kind {
         IVLCmdKind::Assert { condition, message } => Ok((condition.clone(), message.clone())),
-        _ => todo!("Not supported (yet)."),
+        IVLCmdKind::Havoc { name, ty } => Ok((postCondition.clone(), "Reason".to_string())),
+        IVLCmdKind::Assignment {expr, name} => Ok((postCondition.subst_ident(&name.ident, expr), "Reason for fail".to_string())),
+        _ => todo!("Not supported (yet). wp"),
     }
 }
