@@ -29,6 +29,13 @@ impl IVLCmd {
             .unwrap_or(IVLCmd::nop())
     }
 
+    pub fn nondet(&self, other: &IVLCmd) -> IVLCmd {
+        IVLCmd {
+            span: Span::default(),
+            kind: IVLCmdKind::NonDet(Box::new(self.clone()), Box::new(other.clone())),
+        }
+    }
+
     pub fn match_cases(body: &Cases) -> IVLCmd {
         IVLCmd {
             span: Span::default(),
@@ -36,12 +43,6 @@ impl IVLCmd {
         }
     }
 
-    pub fn nondet(&self, other: &IVLCmd) -> IVLCmd {
-        IVLCmd {
-            span: Span::default(),
-            kind: IVLCmdKind::NonDet(Box::new(self.clone()), Box::new(other.clone())),
-        }
-    }
     pub fn nondets(cmds: &[IVLCmd]) -> IVLCmd {
         cmds.iter()
             .cloned()

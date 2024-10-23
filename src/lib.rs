@@ -110,7 +110,7 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
         },
         IVLCmdKind::Assert { condition, message } => Ok((condition.clone() & post_condition.clone(), message.clone())),
         IVLCmdKind::Havoc { name, ty } => Ok((post_condition.clone(), "Havoc".to_string())),
-        IVLCmdKind::Assignment {expr, name} => Ok((post_condition.subst_ident(&name.ident, expr), format!("{} := {}", name, expr))),
+        IVLCmdKind::Assignment { expr, name } => Ok((post_condition.subst_ident(&name.ident, expr), format!("{} := {}", name, expr))),
         IVLCmdKind::NonDet(ivl1, ivl2) => {
             let (wp1, msg1) = wp(ivl1, post_condition)?;
             let (wp2, msg2) = wp(ivl2, post_condition)?;
@@ -120,20 +120,35 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
         IVLCmdKind::Match { body } => {
             let mut wps: Vec<Expr> = vec![];
             let mut messages: Vec<String> = vec![];
-        
+            let mut match_conditions: Vec<Expr> = vec![];
+
             for case in &body.cases {
+                let case_condition = case.condition.clone();
+
+                // Calculate wp for the command inside the branch
                 let (case_wp, msg) = wp(&cmd_to_ivlcmd(&case.cmd)?, post_condition)?;
 
-                let case_wp_with_condition = (!case.condition.clone()) | case_wp;
+                // Use implication: case_condition => wp(case_cmd)
+                let case_wp_with_condition = case_condition.clone().imp(&case_wp);
+
                 wps.push(case_wp_with_condition);
+                match_conditions.push(case_condition); // Track conditions for use after match
                 messages.push(msg);
             }
 
+            // Combine all the case weakest preconditions using OR
             let combined_wp = wps.into_iter().reduce(|a, b| a | b).unwrap_or(Expr::bool(true));
-        
+
+            // Combine all the messages
             let combined_msg = messages.join(", ");
-        
-            Ok((combined_wp, combined_msg))
+
+            // Combine all match conditions (disjunction of all possible match conditions)
+            let match_condition = match_conditions.into_iter().reduce(|a, b| a | b).unwrap_or(Expr::bool(true));
+
+            // Return combined wp and message, but also update post-condition
+            // to include the match condition so it propagates to the next statement
+            let new_post_condition = match_condition.imp(post_condition);
+            Ok((combined_wp & new_post_condition, combined_msg))
         },
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
