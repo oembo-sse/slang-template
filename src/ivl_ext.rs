@@ -36,13 +36,6 @@ impl IVLCmd {
         }
     }
 
-    pub fn match_cases(body: &Cases) -> IVLCmd {
-        IVLCmd {
-            span: Span::default(),
-            kind: IVLCmdKind::Match { body: body.clone() },
-        }
-    }
-
     pub fn nondets(cmds: &[IVLCmd]) -> IVLCmd {
         cmds.iter()
             .cloned()
@@ -91,14 +84,7 @@ impl std::fmt::Display for IVLCmd {
             IVLCmdKind::Assume { condition } => write!(f, "assume {}", condition),
             IVLCmdKind::Assert { condition, .. } => write!(f, "assert {}", condition),
             IVLCmdKind::Seq(c1, c2) => write!(f, "{} ; {}", c1, c2),
-            IVLCmdKind::NonDet(c1, c2) => write!(f, "{{ {} }} [] {{ {} }}", c1, c2),
-            IVLCmdKind::Match { body } => {
-                let mut match_str = String::new();
-                for case in &body.cases {
-                    match_str.push_str(&format!("{} => {:?}, ", case.condition, case.cmd));
-                }
-                write!(f, "match {{ {} }}", match_str.trim_end_matches(", "))
-            },
+            IVLCmdKind::NonDet(c1, c2) => write!(f, "{{ {} }} [] {{ {} }}", c1, c2)
         }
     }
 }

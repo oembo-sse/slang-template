@@ -18,8 +18,6 @@ pub enum IVLCmdKind {
     Assume { condition: Expr },
     Assert { condition: Expr, message: String },
     
-    Match { body: Cases },
-
     Seq(Box<IVLCmd>, Box<IVLCmd>),
     NonDet(Box<IVLCmd>, Box<IVLCmd>),
 }

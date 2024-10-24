@@ -75,9 +75,7 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
             })
         },
         CmdKind::Assert { condition, .. } => Ok(IVLCmd::assert(condition, "Assert might fail!")),
-        CmdKind::Assume { condition } => {
-            Ok(IVLCmd::assume(condition))
-        },
+        CmdKind::Assume { condition } => Ok(IVLCmd::assume(condition)),
         CmdKind::VarDefinition { name, ty, expr } => {
             if let Some(expr) = expr {
                 Ok(IVLCmd::assign(name, expr))
@@ -93,6 +91,7 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
                 let cmd = cmd_to_ivlcmd(&case.cmd)?;
                 cases.push(IVLCmd::seq(&condition, &cmd));
             }
+            print!("cases: {}", IVLCmd::nondets(&cases));
             Ok(IVLCmd::nondets(&cases))
         },
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
@@ -108,6 +107,7 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
             let (wp1, msg1) = wp(ivl1, &wp2)?;
             Ok((wp1, format!("msg2: {}", msg2)))
         },
+        IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition) , format!("{} => {}", condition, post_condition))),
         IVLCmdKind::Assert { condition, message } => Ok((condition.clone() & post_condition.clone(), message.clone())),
         IVLCmdKind::Havoc { name, ty } => Ok((post_condition.clone(), "Havoc".to_string())),
         IVLCmdKind::Assignment { expr, name } => Ok((post_condition.subst_ident(&name.ident, expr), format!("{} := {}", name, expr))),
@@ -115,40 +115,6 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
             let (wp1, msg1) = wp(ivl1, post_condition)?;
             let (wp2, msg2) = wp(ivl2, post_condition)?;
             Ok((wp1.clone().and(&wp2), format!("Msg1: {}, msg2: {}", msg1, msg2)))
-        },
-        IVLCmdKind::Assume { condition } => Ok((condition.clone() & post_condition.clone(), format!("{} & {}", condition, post_condition))),
-        IVLCmdKind::Match { body } => {
-            let mut wps: Vec<Expr> = vec![];
-            let mut messages: Vec<String> = vec![];
-            let mut match_conditions: Vec<Expr> = vec![];
-
-            for case in &body.cases {
-                let case_condition = case.condition.clone();
-
-                // Calculate wp for the command inside the branch
-                let (case_wp, msg) = wp(&cmd_to_ivlcmd(&case.cmd)?, post_condition)?;
-
-                // Use implication: case_condition => wp(case_cmd)
-                let case_wp_with_condition = case_condition.clone().imp(&case_wp);
-
-                wps.push(case_wp_with_condition);
-                match_conditions.push(case_condition); // Track conditions for use after match
-                messages.push(msg);
-            }
-
-            // Combine all the case weakest preconditions using OR
-            let combined_wp = wps.into_iter().reduce(|a, b| a | b).unwrap_or(Expr::bool(true));
-
-            // Combine all the messages
-            let combined_msg = messages.join(", ");
-
-            // Combine all match conditions (disjunction of all possible match conditions)
-            let match_condition = match_conditions.into_iter().reduce(|a, b| a | b).unwrap_or(Expr::bool(true));
-
-            // Return combined wp and message, but also update post-condition
-            // to include the match condition so it propagates to the next statement
-            let new_post_condition = match_condition.imp(post_condition);
-            Ok((combined_wp & new_post_condition, combined_msg))
         },
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
