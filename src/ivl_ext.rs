@@ -1,3 +1,5 @@
+use std::collections::btree_set::Union;
+
 use slang::{
     ast::{Expr, Name, Type, Cases},
     Span,
@@ -9,7 +11,7 @@ use crate::ivl::{IVLCmd, IVLCmdKind};
 impl IVLCmd {
     pub fn assign(name: &Name, expr: &Expr) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: expr.span,
             kind: IVLCmdKind::Assignment {
                 name: name.clone(),
                 expr: expr.clone(),
@@ -18,7 +20,7 @@ impl IVLCmd {
     }
     pub fn seq(&self, other: &IVLCmd) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: Span::union(self.span, other.span),
             kind: IVLCmdKind::Seq(Box::new(self.clone()), Box::new(other.clone())),
         }
     }
@@ -44,7 +46,7 @@ impl IVLCmd {
     }
     pub fn assume(condition: &Expr) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: condition.span,
             kind: IVLCmdKind::Assume {
                 condition: condition.clone(),
             },
@@ -52,7 +54,7 @@ impl IVLCmd {
     }
     pub fn assert(condition: &Expr, message: &str) -> IVLCmd {
         IVLCmd {
-            span: Span::default(),
+            span: condition.span,
             kind: IVLCmdKind::Assert {
                 condition: condition.clone(),
                 message: message.to_owned(),
@@ -70,11 +72,20 @@ impl IVLCmd {
     }
 
     pub fn return_ivl(expr: &Option<Expr>) -> IVLCmd {
-        IVLCmd { 
-            span: Span::default(), 
-            kind: IVLCmdKind::Return { 
-                    expr: expr.clone() 
-            } 
+        if let Some(exprS) = expr {
+            IVLCmd { 
+                span: exprS.span,  
+                kind: IVLCmdKind::Return { 
+                        expr: expr.clone() 
+                } 
+            }
+        } else {
+            IVLCmd { 
+                span: Span::default(),
+                kind: IVLCmdKind::Return { 
+                        expr: expr.clone() 
+                } 
+            }
         }
     }
 

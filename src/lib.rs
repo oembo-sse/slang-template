@@ -3,7 +3,7 @@ mod ivl_ext;
 
 use ivl::{IVLCmd, IVLCmdKind};
 use slang::ast::{Cmd, CmdKind, Expr};
-use slang_ui::prelude::*;
+use slang_ui::{prelude::*, Report};
 
 pub struct App;
 
@@ -14,6 +14,10 @@ impl slang_ui::Hook for App {
 
         // Iterate methods
         for m in file.methods() {
+
+
+
+
             // Get method's preconditions;
             let pres = m.requires();
             // Merge them into a single condition
@@ -33,14 +37,15 @@ impl slang_ui::Hook for App {
             // Calculate obligation and error message (if obligation is not
             // verified)
             
-            let pros = m.ensures();
+            // Get method's postconditions:
+            let posts = m.ensures();
             // Merge them into a single condition
-            let pro = pros
+            let post = posts
                 .cloned()
                 .reduce(|a, b| a & b)
                 .unwrap_or(Expr::bool(true));
 
-            let (oblig, msg) = wp(&ivl, &pro)?;
+            let (oblig, msg) = wp(&ivl, &post)?;
             // Convert obligation to SMT expression
             let soblig = oblig.smt()?;
 
@@ -111,10 +116,16 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
 fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {  
     match &ivl.kind {
         IVLCmdKind::Seq(ivl1, ivl2) => {
+            if let IVLCmdKind::Return { .. } = ivl1.kind {
+                return Ok((Expr::bool(false),
+                    format!("Return statement found in the middle of a sequence! Return must be the last command.")
+                ));
+            }
+
             let (wp2, msg2) = wp(ivl2, post_condition)?;
             let (wp1, msg1) = wp(ivl1, &wp2)?;
             Ok((wp1, format!("msg2: {}", msg2)))
-        },
+        }
         IVLCmdKind::Assume { condition } => Ok((condition.clone().imp(post_condition) , format!("{} => {}", condition, post_condition))),
         IVLCmdKind::Assert { condition, message } => Ok((condition.clone() & post_condition.clone(), message.clone())),
         IVLCmdKind::Havoc { name, ty } => Ok((post_condition.clone(), "Havoc".to_string())),
