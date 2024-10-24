@@ -68,6 +68,16 @@ impl IVLCmd {
             span: Span::default(),
         }
     }
+
+    pub fn return_ivl(expr: &Option<Expr>) -> IVLCmd {
+        IVLCmd { 
+            span: Span::default(), 
+            kind: IVLCmdKind::Return { 
+                    expr: expr.clone() 
+            } 
+        }
+    }
+
     pub fn nop() -> IVLCmd {
         IVLCmd::assume(&Expr::bool(true))
     }
@@ -84,7 +94,13 @@ impl std::fmt::Display for IVLCmd {
             IVLCmdKind::Assume { condition } => write!(f, "assume {}", condition),
             IVLCmdKind::Assert { condition, .. } => write!(f, "assert {}", condition),
             IVLCmdKind::Seq(c1, c2) => write!(f, "{} ; {}", c1, c2),
-            IVLCmdKind::NonDet(c1, c2) => write!(f, "{{ {} }} [] {{ {} }}", c1, c2)
+            IVLCmdKind::NonDet(c1, c2) => write!(f, "{{ {} }} [] {{ {} }}", c1, c2),
+            IVLCmdKind::Return { expr } => {
+                match expr {
+                    Some(e) => write!(f, "return with {}", e),
+                    None           => write!(f, "return without") 
+                }
+            }
         }
     }
 }

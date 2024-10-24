@@ -32,7 +32,15 @@ impl slang_ui::Hook for App {
             let ivl = cmd_to_ivlcmd(cmd)?;
             // Calculate obligation and error message (if obligation is not
             // verified)
-            let (oblig, msg) = wp(&ivl, &Expr::bool(true))?;
+            
+            let pros = m.ensures();
+            // Merge them into a single condition
+            let pro = pros
+                .cloned()
+                .reduce(|a, b| a & b)
+                .unwrap_or(Expr::bool(true));
+
+            let (oblig, msg) = wp(&ivl, &pro)?;
             // Convert obligation to SMT expression
             let soblig = oblig.smt()?;
 
@@ -91,16 +99,16 @@ fn cmd_to_ivlcmd(cmd: &Cmd) -> Result<IVLCmd> {
                 let cmd = cmd_to_ivlcmd(&case.cmd)?;
                 cases.push(IVLCmd::seq(&condition, &cmd));
             }
-            print!("cases: {}", IVLCmd::nondets(&cases));
             Ok(IVLCmd::nondets(&cases))
         },
+        CmdKind::Return { expr } => Ok(IVLCmd::return_ivl(expr)),
         _ => todo!("Not supported (yet). cmd_to_ivlcmd"),
     }
 }
 
 // Weakest precondition of (assert-only) IVL programs comprised of a single
 // assertion
-fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
+fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {  
     match &ivl.kind {
         IVLCmdKind::Seq(ivl1, ivl2) => {
             let (wp2, msg2) = wp(ivl2, post_condition)?;
@@ -116,6 +124,12 @@ fn wp(ivl: &IVLCmd, post_condition: &Expr) -> Result<(Expr, String)> {
             let (wp2, msg2) = wp(ivl2, post_condition)?;
             Ok((wp1.clone().and(&wp2), format!("Msg1: {}, msg2: {}", msg1, msg2)))
         },
+        IVLCmdKind::Return { expr } => {
+            match expr {
+                Some(e) => Ok((post_condition.subst_result(e), format!("couldnt return type {}", e))),
+                None           => Ok((post_condition.clone(), format!("Return without type failed")))
+            }
+        }
         _ => todo!("{}", format!("Not supported (yet). wp for {}", ivl)),
     }
 }
