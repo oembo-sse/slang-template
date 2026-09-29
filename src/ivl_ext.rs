@@ -72,6 +72,12 @@ impl IVLCmd {
     pub fn unreachable() -> IVLCmd {
         IVLCmd::assume(&Expr::bool(false))
     }
+    pub fn with_span(self, span: Span) -> IVLCmd {
+        IVLCmd {
+            span,
+            kind: self.kind,
+        }
+    }
 }
 
 impl std::fmt::Display for IVLCmd {
